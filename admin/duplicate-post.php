@@ -68,50 +68,40 @@ class DuplicatePost{
 	 * Test if the user is allowed to copy posts
 	 */
 	static function duplicate_post_is_current_user_allowed_to_copy() {
-		global $post;
-  		$qo = get_queried_object();
-  		$allowed = false;
-  		$settings = get_option('dem_main_settings');
-	  	$current_user = wp_get_current_user();
+		$allowed = false;
 
-	  	if($qo){
-	  		$authorID = $qo->post_author;
-	  		$postType = $qo->post_type;
-	  	} else {
-	  		if(isset($post)){
-	  			$authorID = $post->post_author;
-	  			$postType = $post->post_type;
-	  		} else {
-	  			$authorID = 0;
-	  		}
-	  	}
+		$settings = get_option( 'dem_main_settings', array() );
 
-	  	$current_roles = $current_user->roles;
-	  	foreach ($current_roles as $key => $role) {
-	  		//echo $value;
-	  		if(isset($settings['edit_access'])) {
-	  			if(in_array($role, $settings['edit_access'])){
-	  			$allowed = true;
-	  			//echo "YES". $value;
-	  			}
-	  		}
+		$post = get_post( get_the_ID() );
 
-	  	}
+		if ( ! $post ) {
+			return false;
+		}
 
-	  	/* by default post author can copy but not merge back */
-	  	if($current_user->ID == $authorID){
-	  		$allowed = true;
-	  	}
+		// We can't guarantee support for other post types yet.
+		if ( ! in_array( $post->post_type, array( 'page', 'post' ) ) ) {
+			return false;
+		}
 
-	  	/* Exclude post types from settings */
-	  	if(isset($settings['exclude_post_types'])) {
-	  		if(is_array($settings['exclude_post_types'])){
-		  		if(in_array($postType, $settings['exclude_post_types'])){
-		  			$allowed = false;
-		  		}
-	  		}
-	  	}
+		// Pages and/or posts can be excluded from settings.
+		if( isset( $settings['exclude_post_types'] ) && is_array( $settings['exclude_post_types'] ) && in_array( $post->post_type , $settings['exclude_post_types'] ) ) {
+			return apply_filters( 'duplicate_post_is_allowed', false );
+		}
 
+		$current_user = wp_get_current_user();
+		$current_roles = $current_user->roles;
+
+		foreach ( $current_roles as $key => $role ) {
+			if( isset( $settings['edit_access'] ) && in_array( $role, $settings['edit_access'] ) ) {
+				$allowed = true;
+				continue;
+			}
+		}
+
+		/* by default post author can copy but not merge back */
+		if( $current_user->ID == $post->post_author ){
+			$allowed = true;
+		}
 
 		return apply_filters( "duplicate_post_is_allowed", $allowed );
 	}
